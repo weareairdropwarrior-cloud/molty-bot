@@ -154,6 +154,16 @@ class APIClient:
         except (APIError, Exception):
             return []
 
+    def list_games_fast(self, status: str = "waiting") -> list:
+        """Fast version: 1 attempt, 3s timeout. Untuk sniping room."""
+        try:
+            return self._request(
+                "GET", f"/games?status={status}",
+                max_retries=1, timeout=3, retry_delay=0
+            ).get("data", [])
+        except Exception:
+            return []
+
     def get_game(self, game_id: str) -> Dict:
         """Get game info."""
         return self.get(f"/games/{game_id}")["data"]
@@ -172,6 +182,14 @@ class APIClient:
         """Register agent in a game. API key in header gives 10 $Moltz."""
         return self.post(
             f"/games/{game_id}/agents/register",
+            json={"name": agent_name}
+        )["data"]
+
+    def register_agent_fast(self, game_id: str, agent_name: str) -> Dict:
+        """Fast version: 1 attempt, 5s timeout. Untuk sniping room."""
+        return self._request(
+            "POST", f"/games/{game_id}/agents/register",
+            max_retries=1, timeout=5, retry_delay=0,
             json={"name": agent_name}
         )["data"]
 

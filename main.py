@@ -309,34 +309,55 @@ class GameLoop:
     # -------------------------------------------------------------------------
 
     def find_and_join_game(self) -> bool:
-        """Find a waiting game and register. Returns True on success."""
+        """
+        Find a waiting game and register.
+        Uses aggressive polling (every ROOM_HUNT_INTERVAL seconds) for speed.
+        Returns True on success.
+        """
+        from config.settings import ROOM_HUNT_INTERVAL
+        import time as _time
+
+        hunt_start = _time.time()
+        attempt = 0
+
+        logger.info("🎯 Room hunting started — aggressive mode (every %ds)", ROOM_HUNT_INTERVAL)
+
         while True:
-            # Find waiting games
-            games = self.api.list_games(status="waiting")
+            attempt += 1
+
+            # ── PHASE 1: Fast scan for waiting games ──────────────────
+            games = self.api.list_games_fast(status="waiting")
             matching = [g for g in games if g.get("entryType") == PREFERRED_GAME_TYPE]
 
             if matching:
+                # ── PHASE 2: Instant registration (no delay!) ─────────
                 game = matching[0]
                 game_id = game["id"]
-                logger.info(f"Found game: {game.get('name')} (ID: {game_id})")
+                elapsed = _time.time() - hunt_start
+                logger.info(
+                    f"⚡ Found room: {game.get('name')} (ID: {game_id}) "
+                    f"after {elapsed:.1f}s / {attempt} attempts"
+                )
 
                 try:
-                    agent = self.api.register_agent(game_id, self.agent_name)
+                    agent = self.api.register_agent_fast(game_id, self.agent_name)
                     self.game_id  = game_id
                     self.agent_id = agent["id"]
-                    logger.info(f"Registered as '{self.agent_name}' | Agent ID: {self.agent_id}")
+                    join_time = _time.time() - hunt_start
+                    logger.info(
+                        f"✅ Registered as '{self.agent_name}' | "
+                        f"Agent ID: {self.agent_id} | "
+                        f"Join time: {join_time:.1f}s"
+                    )
                     return True
 
                 except APIError as e:
                     if e.code == "GAME_ALREADY_STARTED":
-                        logger.warning("Game started before we could join, looking for another")
-                        continue
+                        logger.warning("Room started before join — retrying instantly")
+                        continue  # No sleep, try immediately
                     elif e.code == "ACCOUNT_ALREADY_IN_GAME":
-                        # Server: akun masih terdaftar di game lain yang sedang running
-                        # Ekstrak game ID dari pesan error jika ada
                         errmsg  = str(e)
                         game_id = None
-                        # Coba parse game ID dari pesan "Current game: <uuid>"
                         import re
                         m = re.search(
                             r"[Cc]urrent game[: ]+([0-9a-f-]{36})",
@@ -349,7 +370,6 @@ class GameLoop:
                             )
                             self.wait_for_current_game_to_finish(game_id)
                         else:
-                            # Tidak tahu game ID-nya — cek via account API
                             logger.warning(
                                 "Account already in a game — checking account for active game..."
                             )
@@ -360,18 +380,17 @@ class GameLoop:
                                     self.wait_for_current_game_to_finish(gid)
                                 else:
                                     logger.warning("Unknown active game — waiting 60s")
-                                    time.sleep(60)
-                        continue  # Setelah game selesai, coba join lagi
+                                    _time.sleep(60)
+                        continue
                     elif e.code == "ONE_AGENT_PER_API_KEY":
                         logger.warning("Already have an agent in this game type, skipping")
                         return False
                     elif e.code == "MAX_AGENTS_REACHED":
-                        logger.warning("Game full, trying another")
-                        continue
+                        logger.warning("Room full — retrying instantly")
+                        continue  # No sleep, snipe next room
                     else:
                         logger.error(f"Registration failed: {e}")
-                        time.sleep(10)
-                        continue
+                        continue  # Retry immediately
 
             elif AUTO_CREATE_GAME:
                 logger.info("No waiting game found — creating one")
@@ -382,8 +401,7 @@ class GameLoop:
                         entry_type=PREFERRED_GAME_TYPE
                     )
                     logger.info(f"Created game: {game['id']}")
-                    time.sleep(2)
-                    continue
+                    continue  # Immediately scan for the new game
                 except APIError as e:
                     if e.code == "WAITING_GAME_EXISTS":
                         logger.warning("Waiting game already exists, re-scanning")
@@ -391,10 +409,14 @@ class GameLoop:
                     logger.error(f"Create game failed: {e}")
 
             else:
-                logger.info(f"No waiting {PREFERRED_GAME_TYPE} games. "
-                            f"Checking in {POLL_INTERVAL_DEAD}s...")
-                self._print_status("idle")
-                time.sleep(POLL_INTERVAL_DEAD)
+                if attempt % 10 == 1:
+                    logger.info(
+                        f"🔍 Hunting for {PREFERRED_GAME_TYPE} rooms... "
+                        f"(attempt #{attempt}, {_time.time() - hunt_start:.0f}s elapsed)"
+                    )
+
+            # ── Aggressive polling interval ───────────────────────────
+            _time.sleep(ROOM_HUNT_INTERVAL)
 
     # -------------------------------------------------------------------------
     # GAME START WAIT
