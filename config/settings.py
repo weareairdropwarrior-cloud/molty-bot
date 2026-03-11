@@ -10,13 +10,13 @@ Edit values here before running the bot.
 # =============================================================================
 # API CREDENTIALS (REQUIRED)
 # =============================================================================
-API_KEY = os.environ.get("API_KEY", "mr_live_0ndljWYGWtJ90uJB9-cT-AjxApsYlLC1")
+API_KEY = os.environ.get("API_KEY", "mr_live_xxxxxxxxxxxxxxxxxxxx")
 BASE_URL = os.environ.get("BASE_URL", "https://cdn.moltyroyale.com/api")
 
 # =============================================================================
 # WALLET (REQUIRED FOR REWARDS)
 # =============================================================================
-WALLET_ADDRESS = os.environ.get("WALLET_ADDRESS", "0xcfee2e9a3b35f77c186a49d49ea75e222b249900")
+WALLET_ADDRESS = os.environ.get("WALLET_ADDRESS", "0xxxxxxxxxxxxxxxxxxxx")
 
 # =============================================================================
 # GAME PREFERENCES
