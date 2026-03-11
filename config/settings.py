@@ -11,7 +11,6 @@ Edit values here before running the bot.
 # API CREDENTIALS (REQUIRED)
 # =============================================================================
 API_KEY = os.environ.get("API_KEY", "mr_live_0ndljWYGWtJ90uJB9-cT-AjxApsYlLC1")
-AGENT_NAME = os.environ.get("AGENT_NAME", "ArangYeouu")
 BASE_URL = os.environ.get("BASE_URL", "https://cdn.moltyroyale.com/api")
 
 # =============================================================================
